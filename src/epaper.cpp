@@ -264,13 +264,13 @@ void Renderer::DrawOnImage(Bitmap& target, Bitmap& src, uint16_t start_height, u
 
             switch (action) {
                 case kRenderActionReplace:
-                    target(i + start_height, j + start_width/8) = src(i, j);
+                    target(i + start_height, j + start_width / 8) = src(i, j);
                     break;
                 case kRenderActionAnd:
-                    target(i + start_height, j + start_width/8) &= src(i, j);
+                    target(i + start_height, j + start_width / 8) &= src(i, j);
                     break;
                 case kRenderActionOr:
-                    target(i + start_height, j + start_width/8) |= src(i, j);
+                    target(i + start_height, j + start_width / 8) |= src(i, j);
                     break;
             }
         }
@@ -281,11 +281,12 @@ void TextRenderer::print_FT_Bitmap(FT_Bitmap* bitmap) const {
     for (uint16_t i = 0; i < bitmap->rows; i++) {
         for (uint16_t j = 0; j < bitmap->width; j++)
             std::wcout << (bitmap->buffer[i * bitmap->width + j] == 0
-                        ? " "
-                        : bitmap->buffer[i * bitmap->width + j] < 128 ? "+" : "*");
+                               ? " "
+                               : bitmap->buffer[i * bitmap->width + j] < 128 ? "+" : "*");
         std::wcout << std::endl;
     }
-    std::wcout << std::endl;;
+    std::wcout << std::endl;
+    ;
 }
 
 TextRenderer::TextRenderer(uint16_t size, std::string font) : size_(size), font_(font) {
@@ -320,9 +321,10 @@ Bitmap TextRenderer::RenderText(std::wstring const text) {
     uint16_t   target_width   = 0;
     uint16_t   target_height  = 0;
     uint16_t   target_advance = 0;
+    uint16_t   pad_size       = 0;
     // loop through the characters to find the required sizes and gaps
     for (auto const& character : text) {
-        FT_Error error = FT_Load_Char(this->face_, character, FT_LOAD_RENDER);
+        FT_Error error = FT_Load_Char(this->face_, character, FT_LOAD_NO_BITMAP);
         if (error) {
             std::wcout << "error3" << std::endl;
         }
@@ -339,12 +341,14 @@ Bitmap TextRenderer::RenderText(std::wstring const text) {
         if (target_advance < this->slot_->advance.x / 64) {
             target_advance = this->slot_->advance.x / 64;
         }
+
+        if ((target_advance > target_height) && target_advance - target_height > pad_size) {
+            pad_size = target_advance - target_height;
+        }
     }
 
-    Bitmap image = Bitmap(std::max(target_height, target_width) * text.size(), target_width);
+    Bitmap image = Bitmap(std::max(target_height, target_advance) * text.size(), target_width);
     image.ClearBlack();
-
-    uint16_t pad_size = target_advance - target_height;
 
     uint16_t k = 0;
     for (auto const& character : text) {
@@ -354,15 +358,22 @@ Bitmap TextRenderer::RenderText(std::wstring const text) {
             std::wcout << "error3" << std::endl;
         }
 
+        // space character does not get rendered
+        // just increment k by the characters it would take up
+        if (character == L' ') {
+            k += ((image.width_bound() * 8) * (std::min(target_advance, target_height) / 2));
+            continue;
+        }
+
         // align all of the caracters on their base, requires shifing shorter characters down (on
         // correctly oriented image) add additional padding to the start of each row and take it
         // away from the padding at the end
         // special case some characters for distinct alignment, otherwise align bottom
         uint16_t start_padding = (target_width - bitmap->rows);
 
-        if (character == L':') {
+        if (character == L':' || character == L'-') {
             start_padding /= 2;
-        } else if (character == L'°'){
+        } else if (character == L'°') {
             start_padding = 0;
         }
 
@@ -378,7 +389,8 @@ Bitmap TextRenderer::RenderText(std::wstring const text) {
         }
 
         // pad the characters with the suggested width
-        k += (image.width_bound() * 8) * pad_size;
+        k += (image.width_bound() * 8) *
+             std::max(((this->slot_->advance.x / 64) - bitmap->width), 1ul);
     }
 
     image.Invert();

@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <bitset>
+#include <cassert>
 #include <chrono>
 #include <cstdint>
 #include <cstring>
@@ -91,10 +92,10 @@ class Epaper {
 // for monochrome images
 class Bitmap {
    public:
-    uint8_t height() const { return this->height_; }              // get height in pixels
-    uint8_t width() const { return this->width_; }                // get width in pixels
-    uint8_t height_bound() const { return this->height_bound_; }  // get height in padded bytes
-    uint8_t width_bound() const { return this->width_bound_; }    // get width in bytes
+    uint16_t height() const { return this->height_; }              // get height in pixels
+    uint16_t width() const { return this->width_; }                // get width in pixels
+    uint16_t height_bound() const { return this->height_bound_; }  // get height in padded bytes
+    uint16_t width_bound() const { return this->width_bound_; }    // get width in bytes
 
     // height and width in pixel values - initialized to white only image
     Bitmap(uint16_t height, uint16_t width);
@@ -153,9 +154,12 @@ class Renderer {
 class TextRenderer : public Renderer {
    public:
     struct Fonts {
-        static constexpr const char* kWeather  = "resources/weathericons-regular-webfont.ttf";
-        static constexpr const char* kRobinson = "resources/VT323-Regular.ttf";
-        static constexpr const char* kVt323    = "resources/VT323-Regular.ttf";
+        static constexpr const char* kWeather     = "resources/weathericons-regular-webfont.ttf";
+        static constexpr const char* kRobinson    = "resources/Robinson Regular.otf";
+        static constexpr const char* kVt323       = "resources/VT323-Regular.ttf";
+        static constexpr const char* kDroidSans   = "resources/DroidSansMono.ttf";
+        static constexpr const char* kLetterBoard = "resources/ShockingHeadline-vYKA.ttf";
+        // static constexpr const char* kLetterBoard = "resources/LetterboardLite-Semibold.ttf";
     };
 
     TextRenderer(uint16_t size, std::string font);
