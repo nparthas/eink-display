@@ -21,7 +21,6 @@ DEPS = $(OBJECTS:.o=.d)
 
 # COMPILE_FLAGS = -std=c++14 -Wall -Wextra -Wpedantic -Werror -O3 
 COMPILE_FLAGS = -std=c++14 -Wall -Wextra -Wpedantic -Werror -g -O0 -fsanitize=address 
-#-Wno-unused-variable -Wno-unused-parameter
 COMPILE_FLAGS_TEST_FLAGS = -Wno-gnu-zero-variadic-macro-arguments 
 INCLUDES = -Iinclude/ -I/usr/local/include -I/usr/include $(shell pkg-config --cflags freetype2)
 TEST_LINKS = 
@@ -64,12 +63,11 @@ all: $(BIN_PATH)/$(BIN_NAME)
 # Creation of the executable
 $(BIN_PATH)/$(BIN_NAME): $(OBJECTS)
 	@echo "Linking: $@"
-	$(CXX) $(OBJECTS) -o $@ -lwiringPi -lfreetype -fsanitize=address
-
+	$(CXX) $(OBJECTS) -o $@ -lwiringPi -lfreetype -fsanitize=address -lcurl
 .PHONY: test-objects
 test-objects: dirs $(OBJECTS_TO_TEST) $(TEST_OBJECTS)
 	@echo "Linking: $(BIN_PATH)/$(TEST_BIN_NAME)"
-	$(CXX) $(OBJECTS_TO_TEST) $(TEST_OBJECTS) -o $(BIN_PATH)/$(TEST_BIN_NAME) -lm $(TEST_LINKS) 
+	$(CXX) $(OBJECTS_TO_TEST) $(TEST_OBJECTS) -o $(BIN_PATH)/$(TEST_BIN_NAME) $(TEST_LINKS) 
 
 .PHONY: test
 test: test-objects
