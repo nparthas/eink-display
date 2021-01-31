@@ -5,5 +5,4 @@ DerivePointerAlignment: false
 PointerAlignment: Left
 AlignConsecutiveDeclarations: true
 AlignConsecutiveAssignments: true
-AlignConsecutiveMacros: true
 AlignTrailingComments: true

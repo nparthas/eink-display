@@ -5,15 +5,23 @@
 #include FT_FREETYPE_H
 
 #include <algorithm>
+#include <array>
 #include <bitset>
 #include <ctime>
 #include <cwctype>
 #include <iostream>
-#include <sstream>
 
 #include "project/epaper.h"
 
 using namespace epaper;
+
+constexpr uint16_t kWeatherFontSize = 65;
+constexpr uint16_t kTextFontSize    = 42;
+constexpr uint16_t kSubTextFontSize = 37;
+constexpr uint16_t kStaticHeightOffset = 4;
+constexpr uint16_t kStaticWidthOffset = 12;
+constexpr uint16_t kZeroHeight = 0;
+constexpr uint16_t kZeroWidth = 0;
 
 std::wstring get_timestring() {
     const static std::wstring DAY[]   = {L"Sunday",   L"Monday", L"Tuesday", L"Wednesday",
@@ -37,6 +45,14 @@ std::wstring get_timestring() {
 }
 
 int main(void) {
+    Weather w("api-key-template.json");
+    auto    forecast = w.GetForecast();
+
+    if (!forecast) {
+        std::wcout << "was unable to get forecast" << std::endl;
+        return -1;
+    }
+
     auto paper = Epaper();
 
     paper.SetUpIos();
@@ -47,40 +63,45 @@ int main(void) {
 
     auto image = Bitmap(Epaper::kHeight, Epaper::kWidth);
 
-    auto weather_renderer = TextRenderer(65, TextRenderer::Fonts::kWeather);
-    auto text_renderer    = TextRenderer(44, TextRenderer::Fonts::kLetterBoard);
-
-    auto weather = weather_renderer.RenderText(L"\uf00d");
-    weather_renderer.DrawOnImage(image, weather, 0, 0);
+    auto weather_renderer = TextRenderer(kWeatherFontSize, TextRenderer::Fonts::kWeather);
+    auto text_renderer    = TextRenderer(kTextFontSize, TextRenderer::Fonts::kLetterBoard);
 
     auto time = text_renderer.RenderText(get_timestring());
-    weather_renderer.DrawOnImage(image, time, 0, Epaper::kWidth - time.width());
+    weather_renderer.DrawOnImage(image, time, kZeroHeight, Epaper::kWidth - time.width());
 
-    auto description = text_renderer.RenderText(L"-28° CLOUDY");
-    weather_renderer.DrawOnImage(image, description, weather.height(), 0);
+    auto weather = weather_renderer.RenderText(forecast->icons[0]);
+    weather_renderer.DrawOnImage(image, weather, kZeroHeight,
+                                 ((Epaper::kWidth - time.width()) - weather.width()) / 2);
 
-    auto smaller_weather_renderer = TextRenderer(37, TextRenderer::Fonts::kWeather);
-    auto text_lower               = text_renderer.RenderText(L"-25");
-    auto text_lower_icon          = smaller_weather_renderer.RenderText(L"\uf018");
+    auto description = text_renderer.RenderText(std::to_wstring(forecast->temperatures[0]) + L"° " +
+                                                forecast->description);
+    weather_renderer.DrawOnImage(image, description, weather.height() + kStaticHeightOffset - 2, kZeroWidth);
 
-    auto offset = weather.height() + 4;
-    weather_renderer.DrawOnImage(image, text_lower_icon, offset, description.width() + 12);
+    auto smaller_weather_renderer = TextRenderer(kSubTextFontSize, TextRenderer::Fonts::kWeather);
+    auto text_lower = text_renderer.RenderText(std::to_wstring(forecast->temperatures[1]) + L"°");
+    auto text_lower_icon = smaller_weather_renderer.RenderText(forecast->icons[1]);
 
-    offset += text_lower_icon.height() + 4;
-    weather_renderer.DrawOnImage(image, text_lower, offset, description.width() + 12);
+    auto offset = weather.height() + kStaticHeightOffset;
+    weather_renderer.DrawOnImage(image, text_lower_icon, offset, description.width() + kStaticWidthOffset);
 
-    offset += text_lower.height() + 4;
-    weather_renderer.DrawOnImage(image, text_lower_icon, offset, description.width() + 12);
+    offset += text_lower_icon.height() + kStaticHeightOffset;
+    weather_renderer.DrawOnImage(image, text_lower, offset, description.width() + kStaticWidthOffset);
 
-    offset += text_lower_icon.height() + 4;
-    weather_renderer.DrawOnImage(image, text_lower, offset, description.width() + 12);
+    text_lower      = text_renderer.RenderText(std::to_wstring(forecast->temperatures[2]) + L"°");
+    text_lower_icon = smaller_weather_renderer.RenderText(forecast->icons[2]);
+
+    offset += text_lower.height() + kStaticHeightOffset;
+    weather_renderer.DrawOnImage(image, text_lower_icon, offset, description.width() + kStaticWidthOffset);
+
+    offset += text_lower_icon.height() + kStaticHeightOffset;
+    weather_renderer.DrawOnImage(image, text_lower, offset, description.width() + kStaticWidthOffset);
 
     image.Print();
 
     paper.DisplayImage(image.Raw());
 
     std::wcout << "Press <Enter> to continue..." << std::endl;
-    std::cin.get();
+    std::wcin.get();
 
     paper.ClearDisplay();
     paper.Shutdown();

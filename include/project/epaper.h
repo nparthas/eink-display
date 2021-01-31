@@ -5,6 +5,7 @@
 #include <wiringPiSPI.h>
 #include FT_FREETYPE_H
 
+#include <curl/curl.h>
 #include <math.h>
 
 #include <algorithm>
@@ -13,11 +14,18 @@
 #include <chrono>
 #include <cstdint>
 #include <cstring>
+#include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include <thread>
 
+#include "third-party/json.hpp"
+
 namespace epaper {
+
+using json = nlohmann::json;
 
 class Epaper {
    public:
@@ -176,6 +184,36 @@ class TextRenderer : public Renderer {
     FT_GlyphSlot slot_;
 
     void print_FT_Bitmap(FT_Bitmap* bitmap) const;
+};
+
+class Weather {
+   public:
+    struct Forecast {
+        std::array<int32_t, 3>      temperatures;  // current temp and temp every 8 hours
+        std::wstring                description;   // description string
+        std::array<std::wstring, 3> icons;         // icon unicode string
+
+        void Print(); // debug
+    };
+
+    Weather(std::string const keyfile);
+    ~Weather() { curl_easy_cleanup(this->curl_); }
+
+    std::unique_ptr<Forecast> GetForecast();
+
+   private:
+    CURL*                        curl_;
+    std::string                  url_;
+    std::unique_ptr<std::string> data_;
+
+    static std::size_t callback(const char* in, std::size_t size, std::size_t num,
+                                std::string* out) {
+        const std::size_t total_size = size * num;
+        out->append(in, total_size);
+        return total_size;
+    }
+
+    std::wstring get_icon_for_id(int32_t const id, uint32_t const tm_hour);
 };
 
 }  // namespace epaper

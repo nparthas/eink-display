@@ -398,4 +398,154 @@ Bitmap TextRenderer::RenderText(std::wstring const text) {
     return image;
 }
 
+void Weather::Forecast::Print() {
+    std::wcout << "Description: " << this->description << std::endl;
+
+    std::wcout << "Temperatures: ";
+    for (auto temp : this->temperatures) {
+        std::wcout << temp << " ";
+    }
+    std::wcout << std::endl;
+
+    std::wcout << "Icons: ";
+    for (auto icon : this->icons) {
+        std::wcout << icon << " ";
+    }
+    std::wcout << std::endl;
+}
+
+Weather::Weather(std::string const keyfile) {
+    std::ifstream f(keyfile);
+    json          api_key;
+
+    f >> api_key;
+
+    std::ostringstream oss;
+
+    oss << "http://api.openweathermap.org/data/2.5/"
+           "onecall?lat="
+        << api_key["lat"] << "&lon=" << api_key["lon"]
+        << "&exclude=alerts,minutely,daily&units=metric&lang=en&"
+           "appid="
+        << api_key["appid"];
+
+    this->url_ = oss.str();
+    this->url_.erase(std::remove(this->url_.begin(), this->url_.end(), '\"'), this->url_.end());
+
+    this->curl_ = curl_easy_init();
+    this->data_ = std::make_unique<std::string>();
+
+    curl_easy_setopt(this->curl_, CURLOPT_URL, this->url_.c_str());
+    curl_easy_setopt(this->curl_, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+    curl_easy_setopt(this->curl_, CURLOPT_TIMEOUT, 10);
+    curl_easy_setopt(this->curl_, CURLOPT_FOLLOWLOCATION, 1L);
+
+    curl_easy_setopt(this->curl_, CURLOPT_WRITEFUNCTION, Weather::callback);
+    curl_easy_setopt(this->curl_, CURLOPT_WRITEDATA, this->data_.get());
+}
+
+std::unique_ptr<Weather::Forecast> Weather::GetForecast() {
+    uint64_t return_code = 0;
+
+    curl_easy_perform(this->curl_);
+    curl_easy_getinfo(this->curl_, CURLINFO_RESPONSE_CODE, &return_code);
+
+    if (return_code == 200) {
+        auto j = json::parse(*this->data_.get(), nullptr, false);
+        if (!j.is_discarded()) {
+            std::unique_ptr<Forecast> forecast = std::make_unique<Forecast>();
+
+            std::string description = j["current"]["weather"][0]["main"].get<std::string>();
+            if (description == "Thunderstorm") {  // special case this once since it's very long
+                description = "Thunder";
+            }
+            forecast->description = std::wstring(description.begin(), description.end());
+
+            // int32_t image_id = j["current"]["weather"][0]["id"].get<int32_t>();
+            // forecast->icon   = this->get_icon_for_id(image_id);
+            std::time_t time_temp = std::time(nullptr);
+            std::tm*    time_out  = std::localtime(&time_temp);
+
+            forecast->temperatures[0] = std::round(j["current"]["temp"].get<double>());
+            for (int i = 0; i < 3; i++) {
+                forecast->temperatures[i] = std::round(j["hourly"][i * 8]["temp"].get<double>());
+
+                int32_t image_id = j["hourly"][i * 8]["weather"][0]["id"];
+                forecast->icons[i] =
+                    this->get_icon_for_id(image_id, (time_out->tm_hour + i * 8) % 24);
+            }
+
+            return forecast;
+
+        } else {
+            std::wcout << "Got good response but with malformed json" << std::endl;
+            return std::unique_ptr<Forecast>(nullptr);
+        }
+    } else {
+        std::wcout << "Couldn't get weather, response code: " << return_code << " retrying later"
+                   << std::endl;
+        auto j = json::parse(*this->data_.get(), nullptr, false);
+        if (!j.is_discarded()) {
+            std::stringstream iss;
+            iss << std::setw(4) << j;
+            std::string  str  = iss.str();
+            std::wstring wstr = std::wstring(str.begin(), str.end());
+            std::wcout << wstr << std::endl;
+        }
+
+        return std::unique_ptr<Forecast>(nullptr);
+    }
+}
+
+std::wstring Weather::get_icon_for_id(int32_t const id, uint32_t const tm_hour) {
+    if (199 < id && id < 300) {
+        // thunderstorm
+        if (id < 210) {
+            // thunkderstorm with rain
+            return L"\uf01e";
+        } else
+
+            if (id < 230) {
+            // thunderstorm
+            return L"\uf016";
+        } else {
+            // thunderstorm with drizzle
+            return L"\uf01d";
+        }
+    } else if (id < 300) {
+        // drizzle
+        return L"\uf01a";
+    } else if (499 < id && id < 600) {
+        // rain
+        if (id < 510) {
+            // regular rain
+            return L"\uf019";
+        } else if (id == 511) {
+            // freezing rain
+            return L"\uf017";
+        } else {
+            // severe rain
+            return L"\uf018";
+        }
+    } else if (id < 700) {
+        // snow
+        return L"\uf01b";
+    } else if (id < 800) {
+        // atmosphere
+        return L"\uf063";
+    } else if (800 < id && id < 900) {
+        return L"\uf013";
+    } else {
+        if (tm_hour >= 6 && tm_hour <= 19) {
+            // clear day
+            return L"\uf00d";
+        } else {
+            // clear night
+            return L"\uf02e";
+        }
+    }
+
+    return L"";
+}
+
 }  // namespace epaper

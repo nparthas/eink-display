@@ -10,3 +10,5 @@ epaper-tests
 *.swp
 
 core
+
+.clangd/
